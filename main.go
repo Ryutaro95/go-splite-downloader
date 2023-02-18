@@ -10,6 +10,7 @@ import (
 
 func main() {
 	splitNum := flag.Int("n", 10, "number of splits")
+	flag.Parse()
 	inputUrl := flag.Arg(0)
 	if err := validInputURL(inputUrl); err != nil {
 		die(err)
@@ -23,6 +24,9 @@ func main() {
 		url:      url,
 		splitNum: *splitNum,
 		ranges:   []string{"bytes=0-100", "bytes=101-200"},
+	}
+	if err := download.Execute(); err != nil {
+		die(err)
 	}
 }
 
