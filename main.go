@@ -1,19 +1,22 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
 )
 
 func main() {
-	url, err := url.Parse("https://example.com")
+	splitNum := flag.Int("n", 10, "number of splits")
+	inputUrl := flag.Arg(0)
+	url, err := url.Parse(inputUrl)
 	if err != nil {
 		die(err)
 	}
 	download := &Downloader{
 		url:      url,
-		splitNum: 8,
+		splitNum: *splitNum,
 		ranges:   []string{"bytes=0-100", "bytes=101-200"},
 	}
 }
