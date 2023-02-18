@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +30,14 @@ func (d *Downloader) Execute() error {
 	}
 	defer response.Body.Close()
 
+	if err := allowedHTTPAcceptsRanges(response); err != nil {
+		return err
+	}
+
+	if err := d.splitToRanges(response); err != nil {
+		return err
+	}
+
 	tempDir, err := os.MkdirTemp("", "partials")
 	if err != nil {
 		return err
@@ -36,6 +45,31 @@ func (d *Downloader) Execute() error {
 	defer os.RemoveAll(tempDir)
 	if err := d.downloadbyRanges(ctx, tempDir); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (d *Downloader) splitToRanges(resp *http.Response) error {
+	if err := validSplitRanges(resp, d.splitNum); err != nil {
+		return err
+	}
+
+	var rangeStart, rangeEnd int
+
+	rangeLength := resp.ContentLength / int64(d.splitNum)
+
+	// 分割回数分のヘッダー情報を ranges に含める
+	for i := 0; i < d.splitNum; i++ {
+		if i != 0 {
+			rangeStart = rangeEnd + 1
+		}
+		rangeEnd = rangeStart + int(rangeLength)
+		if i == d.splitNum-1 && rangeEnd != int(rangeLength) {
+			rangeEnd = int(resp.ContentLength)
+		}
+
+		d.ranges = append(d.ranges, fmt.Sprintf("bytes=%d-%d", rangeStart, rangeEnd))
 	}
 
 	return nil
@@ -77,6 +111,20 @@ func (d *Downloader) downloadbyRanges(ctx context.Context, tempDir string) error
 		})
 	}
 	return eg.Wait()
+}
+
+func allowedHTTPAcceptsRanges(resp *http.Response) error {
+	if resp.Header.Get("Accept-Ranges") != "bytes" {
+		return errors.New("split download is not supported in this resopnse")
+	}
+	return nil
+}
+
+func validSplitRanges(resp *http.Response, splitNum int) error {
+	if int(resp.ContentLength) < splitNum {
+		return errors.New("the number of split ranges is larger then file length")
+	}
+	return nil
 }
 
 func generatePartialPath(tempDir string, i int) string {
