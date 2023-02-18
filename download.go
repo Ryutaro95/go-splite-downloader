@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -44,6 +45,10 @@ func (d *Downloader) Execute() error {
 	}
 	defer os.RemoveAll(tempDir)
 	if err := d.downloadbyRanges(ctx, tempDir); err != nil {
+		return err
+	}
+
+	if err := d.combine(tempDir); err != nil {
 		return err
 	}
 
@@ -111,6 +116,29 @@ func (d *Downloader) downloadbyRanges(ctx context.Context, tempDir string) error
 		})
 	}
 	return eg.Wait()
+}
+
+func (d *Downloader) combine(tempDir string) error {
+	base := filepath.Base(d.url.EscapedPath())
+	f, err := os.Create(base)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for i := range d.ranges {
+		path := generatePartialPath(tempDir, i)
+		partial, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(f, partial)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func allowedHTTPAcceptsRanges(resp *http.Response) error {
