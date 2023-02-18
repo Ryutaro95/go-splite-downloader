@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -10,6 +11,10 @@ import (
 func main() {
 	splitNum := flag.Int("n", 10, "number of splits")
 	inputUrl := flag.Arg(0)
+	if err := validInputURL(inputUrl); err != nil {
+		die(err)
+	}
+
 	url, err := url.Parse(inputUrl)
 	if err != nil {
 		die(err)
@@ -19,6 +24,13 @@ func main() {
 		splitNum: *splitNum,
 		ranges:   []string{"bytes=0-100", "bytes=101-200"},
 	}
+}
+
+func validInputURL(url string) error {
+	if url == "" {
+		return errors.New("URL is required")
+	}
+	return nil
 }
 
 func die(err error) {
